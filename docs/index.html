@@ -1,0 +1,980 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="dark">
+<title>Personal iCal QR Code Generator</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{min-height:100%;background:#111827;color:#fff;font-family:-apple-system,"Segoe UI",system-ui,sans-serif;font-size:15px;line-height:1.6}
+body{padding:24px 16px 48px}
+h1{text-align:center;font-size:1.3rem;font-weight:600;letter-spacing:.04em;color:#e5e7eb;margin-bottom:4px}
+.form-wrap{max-width:560px;margin:0 auto}
+.field{position:relative;margin-bottom:16px}
+label{display:block;font-size:.78rem;font-weight:500;margin-bottom:4px;text-transform:uppercase;letter-spacing:.06em}
+label.mandatory{color:#ffffff}
+label.optional{color:rgba(255,255,255,.5)}
+input[type=text],input[type=date],input[type=time],input[type=url],textarea{
+  width:100%;background:#0d111a;color:#fff;border:1px solid #4a5568;border-radius:6px;
+  padding:9px 12px;font-size:.95rem;font-family:inherit;outline:none;transition:border-color .15s}
+input[type=text]:focus,input[type=date]:focus,input[type=time]:focus,input[type=url]:focus,textarea:focus{border-color:#4f6ef7;box-shadow:0 0 0 2px rgba(79,110,247,.18)}
+input::placeholder,textarea::placeholder{color:rgba(255,255,255,.5)}
+textarea{resize:vertical;min-height:72px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.allday-col{display:flex;flex-direction:column}
+.allday-label-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+.allday-label-row .time-label{margin-bottom:0}
+.allday-check{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.allday-check label{margin:0;font-size:.78rem;font-weight:500;text-transform:uppercase;letter-spacing:.06em;color:#ffffff;cursor:pointer;white-space:nowrap}
+.check-row{display:flex;align-items:center;gap:8px;margin-bottom:0}
+.check-row label{margin:0;font-size:.88rem;text-transform:none;letter-spacing:0;color:#fff;font-weight:400;cursor:pointer}
+.checks-line{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:0;margin-top:10px}
+input[type=checkbox]{width:16px;height:16px;accent-color:#4f6ef7;cursor:pointer;flex-shrink:0}
+.btn-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+button{cursor:pointer;border:none;border-radius:6px;font-family:inherit;font-size:.9rem;font-weight:600;padding:10px 20px;transition:background .15s,transform .08s}
+button:active{transform:scale(.97)}
+#gen-btn{background:#4f6ef7;color:#fff;flex:1;letter-spacing:.04em}
+#gen-btn:hover{background:#3b5bdb}
+#clear-btn{background:#1f2937;color:#9ca3af;border:1px solid #374151}
+#clear-btn:hover{background:#374151;color:#e5e7eb}
+#forget-btn{background:#7f1d1d;color:#fca5a5;border:1px solid #991b1b;display:none}
+#forget-btn:hover{background:#991b1b}
+#dl-btn{background:#065f46;color:#6ee7b7;border:1px solid #047857;display:none}
+#dl-btn:hover{background:#047857}
+#copy-btn{background:#1f2937;color:#9ca3af;border:1px solid #374151}
+#copy-btn:hover{background:#374151;color:#e5e7eb}
+#copy-btn.copied{color:#6ee7b7;border-color:#047857}
+.output-wrap{max-width:560px;margin:28px auto 0;text-align:center}
+#qr-output{display:inline-block;background:#fff;padding:12px;border-radius:6px;line-height:0}
+#qr-output canvas,#qr-output img{display:block}
+#qr-output:empty{display:none}
+.ac-wrap{position:relative}
+#ac-list{position:absolute;top:100%;left:0;right:0;background:#1a2235;border:1px solid #2d3748;border-radius:6px;list-style:none;z-index:50;max-height:220px;overflow-y:auto;display:none;margin-top:2px}
+#ac-list li{padding:8px 12px;cursor:pointer;font-size:.9rem;color:#d1d5db;border-bottom:1px solid #1f2937}
+#ac-list li:last-child{border-bottom:none}
+#ac-list li:hover,#ac-list li.active{background:#2d3f6b;color:#fff}
+#qr-hint{margin-top:-8px;margin-bottom:16px;font-size:.8rem;color:#fbbf24;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.28);border-radius:6px;padding:7px 12px;display:none}
+/* date/time inputs — force white text in Chrome */
+input[type=date]::-webkit-calendar-picker-indicator,
+input[type=time]::-webkit-calendar-picker-indicator{filter:invert(1) opacity(.5);cursor:pointer}
+input[type=time]:disabled{opacity:.3;cursor:not-allowed}
+label.time-label.dimmed{color:rgba(255,255,255,.3)}
+</style>
+</head>
+<body>
+<h1>Personal iCal QR Code Generator</h1>
+<p style="text-align:center;font-size:.78rem;color:#9eaffa;margin-top:0;margin-bottom:20px">Works locally · No content is ever leaked · Made with IBM Bob.</p>
+<div class="form-wrap">
+  <form id="qr-form" autocomplete="off" novalidate>
+
+    <div class="field ac-wrap">
+      <label class="mandatory" for="title">Event Title *</label>
+      <input type="text" id="title" name="title" placeholder="My Event" required>
+      <ul id="ac-list" role="listbox"></ul>
+    </div>
+
+    <div class="row2" style="margin-top:4px">
+      <div class="field">
+        <label class="mandatory" for="startDate">Start Date *</label>
+        <input type="date" id="startDate" name="startDate" required>
+      </div>
+      <div class="field allday-col">
+        <div class="allday-label-row">
+          <label class="mandatory time-label" id="startTimeLabel" for="startTime">Start Time *</label>
+          <div class="allday-check">
+            <label for="allDay">All day</label>
+            <input type="checkbox" id="allDay" name="allDay">
+          </div>
+        </div>
+        <input type="time" id="startTime" name="startTime" required>
+      </div>
+    </div>
+
+    <div class="row2">
+      <div class="field">
+        <label class="mandatory" for="endDate">End Date *</label>
+        <input type="date" id="endDate" name="endDate" required>
+      </div>
+      <div class="field">
+        <label class="mandatory time-label" id="endTimeLabel" for="endTime">End Time *</label>
+        <input type="time" id="endTime" name="endTime" required>
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="optional" for="location">Location</label>
+      <input type="text" id="location" name="location" placeholder="Room / address / online link">
+    </div>
+
+    <div class="field">
+      <label class="optional" for="description">Description</label>
+      <textarea id="description" name="description" placeholder="Additional details…"></textarea>
+    </div>
+
+    <div id="qr-hint"></div>
+
+    <div class="field">
+      <label class="optional" for="url">URL</label>
+      <input type="url" id="url" name="url" placeholder="https://example.com">
+    </div>
+
+    <div class="field">
+      <label class="optional" for="organizer">Organizer / Contact</label>
+      <input type="text" id="organizer" name="organizer" placeholder="Name or email@example.com">
+    </div>
+
+    <div class="checks-line">
+      <div class="check-row">
+        <input type="checkbox" id="remember" name="remember">
+        <label for="remember">Remember this entry after CREATE</label>
+      </div>
+      <div class="check-row">
+        <input type="checkbox" id="invert" name="invert">
+        <label for="invert">Invert QR colours (white modules on dark)</label>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button type="submit" id="gen-btn">CREATE QR CODE</button>
+      <button type="button" id="clear-btn">Clear form</button>
+      <button type="button" id="forget-btn">Forget this entry</button>
+    </div>
+
+  </form>
+</div>
+
+<div class="output-wrap">
+  <div id="qr-output" title=""></div>
+  <div class="btn-row" style="justify-content:center;margin-top:14px">
+    <button type="button" id="dl-btn">&#8659; Download compact PNG</button>
+    <button type="button" id="copy-btn" style="display:none">Copy iCal text</button>
+  </div>
+</div>
+
+<script>
+var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this.parsedData=Array.from((new TextEncoder).encode(a))}function b(a,b){this.typeNumber=a,this.errorCorrectLevel=b,this.modules=null,this.moduleCount=0,this.dataCache=null,this.dataList=[]}function i(a,b){if(void 0==a.length)throw new Error(a.length+"/"+b);for(var c=0;c<a.length&&0==a[c];)c++;this.num=new Array(a.length-c+b);for(var d=0;d<a.length-c;d++)this.num[d]=a[d+c]}function j(a,b){this.totalCount=a,this.dataCount=b}function k(){this.buffer=[],this.length=0}function m(){return"undefined"!=typeof CanvasRenderingContext2D}function n(){var a=!1,b=navigator.userAgent;return/android/i.test(b)&&(a=!0,aMat=b.toString().match(/android ([0-9]\.[0-9])/i),aMat&&aMat[1]&&(a=parseFloat(aMat[1]))),a}function r(a,b){for(var c=1,e=s(a),f=0,g=l.length;g>=f;f++){var h=0;switch(b){case d.L:h=l[f][0];break;case d.M:h=l[f][1];break;case d.Q:h=l[f][2];break;case d.H:h=l[f][3]}if(h>=e)break;c++}if(c>l.length)throw new Error("Too long data");return c}function s(a){return(new TextEncoder).encode(a).length}a.prototype={getLength:function(){return this.parsedData.length},write:function(a){for(var b=0,c=this.parsedData.length;c>b;b++)a.put(this.parsedData[b],8)}},b.prototype={addData:function(b){var c=new a(b);this.dataList.push(c),this.dataCache=null},isDark:function(a,b){if(0>a||this.moduleCount<=a||0>b||this.moduleCount<=b)throw new Error(a+","+b);return this.modules[a][b]},getModuleCount:function(){return this.moduleCount},make:function(){this.makeImpl(!1,this.getBestMaskPattern())},makeImpl:function(a,c){this.moduleCount=4*this.typeNumber+17,this.modules=new Array(this.moduleCount);for(var d=0;d<this.moduleCount;d++){this.modules[d]=new Array(this.moduleCount);for(var e=0;e<this.moduleCount;e++)this.modules[d][e]=null}this.setupPositionProbePattern(0,0),this.setupPositionProbePattern(this.moduleCount-7,0),this.setupPositionProbePattern(0,this.moduleCount-7),this.setupPositionAdjustPattern(),this.setupTimingPattern(),this.setupTypeInfo(a,c),this.typeNumber>=7&&this.setupTypeNumber(a),null==this.dataCache&&(this.dataCache=b.createData(this.typeNumber,this.errorCorrectLevel,this.dataList)),this.mapData(this.dataCache,c)},setupPositionProbePattern:function(a,b){for(var c=-1;7>=c;c++)if(!(-1>=a+c||this.moduleCount<=a+c))for(var d=-1;7>=d;d++)-1>=b+d||this.moduleCount<=b+d||(this.modules[a+c][b+d]=c>=0&&6>=c&&(0==d||6==d)||d>=0&&6>=d&&(0==c||6==c)||c>=2&&4>=c&&d>=2&&4>=d?!0:!1)},getBestMaskPattern:function(){for(var a=0,b=0,c=0;8>c;c++){this.makeImpl(!0,c);var d=f.getLostPoint(this);(0==c||a>d)&&(a=d,b=c)}return b},createMovieClip:function(a,b,c){var d=a.createEmptyMovieClip(b,c),e=1;this.make();for(var f=0;f<this.modules.length;f++)for(var g=f*e,h=0;h<this.modules[f].length;h++){var i=h*e,j=this.modules[f][h];j&&(d.beginFill(0,100),d.moveTo(i,g),d.lineTo(i+e,g),d.lineTo(i+e,g+e),d.lineTo(i,g+e),d.endFill())}return d},setupTimingPattern:function(){for(var a=8;a<this.moduleCount-8;a++)null==this.modules[a][6]&&(this.modules[a][6]=0==a%2);for(var b=8;b<this.moduleCount-8;b++)null==this.modules[6][b]&&(this.modules[6][b]=0==b%2)},setupPositionAdjustPattern:function(){for(var a=f.getPatternPosition(this.typeNumber),b=0;b<a.length;b++)for(var c=0;c<a.length;c++){var d=a[b],e=a[c];if(null==this.modules[d][e])for(var g=-2;2>=g;g++)for(var h=-2;2>=h;h++)this.modules[d+g][e+h]=-2==g||2==g||-2==h||2==h||0==g&&0==h?!0:!1}},setupTypeNumber:function(a){for(var b=f.getBCHTypeNumber(this.typeNumber),c=0;18>c;c++){var d=!a&&1==(1&b>>c);this.modules[Math.floor(c/3)][c%3+this.moduleCount-8-3]=d}for(var c=0;18>c;c++){var d=!a&&1==(1&b>>c);this.modules[c%3+this.moduleCount-8-3][Math.floor(c/3)]=d}},setupTypeInfo:function(a,b){for(var c=this.errorCorrectLevel<<3|b,d=f.getBCHTypeInfo(c),e=0;15>e;e++){var g=!a&&1==(1&d>>e);6>e?this.modules[e][8]=g:8>e?this.modules[e+1][8]=g:this.modules[this.moduleCount-15+e][8]=g}for(var e=0;15>e;e++){var g=!a&&1==(1&d>>e);8>e?this.modules[8][this.moduleCount-e-1]=g:9>e?this.modules[8][15-e-1+1]=g:this.modules[8][15-e-1]=g}this.modules[this.moduleCount-8][8]=!a},mapData:function(a,b){for(var c=-1,d=this.moduleCount-1,e=7,g=0,h=this.moduleCount-1;h>0;h-=2)for(6==h&&h--;;){for(var i=0;2>i;i++)if(null==this.modules[d][h-i]){var j=!1;g<a.length&&(j=1==(1&a[g]>>>e));var k=f.getMask(b,d,h-i);k&&(j=!j),this.modules[d][h-i]=j,e--,-1==e&&(g++,e=7)}if(d+=c,0>d||this.moduleCount<=d){d-=c,c=-c;break}}}},b.PAD0=236,b.PAD1=17,b.createData=function(a,c,d){for(var e=j.getRSBlocks(a,c),g=new k,h=0;h<d.length;h++){var i=d[h];g.put(i.mode,4),g.put(i.getLength(),f.getLengthInBits(i.mode,a)),i.write(g)}for(var l=0,h=0;h<e.length;h++)l+=e[h].dataCount;if(g.getLengthInBits()>8*l)throw new Error("code length overflow. ("+g.getLengthInBits()+">"+8*l+")");for(g.getLengthInBits()+4<=8*l&&g.put(0,4);0!=g.getLengthInBits()%8;)g.putBit(!1);for(;;){if(g.getLengthInBits()>=8*l)break;if(g.put(b.PAD0,8),g.getLengthInBits()>=8*l)break;g.put(b.PAD1,8)}return b.createBytes(g,e)},b.createBytes=function(a,b){for(var c=0,d=0,e=0,g=new Array(b.length),h=new Array(b.length),j=0;j<b.length;j++){var k=b[j].dataCount,l=b[j].totalCount-k;d=Math.max(d,k),e=Math.max(e,l),g[j]=new Array(k);for(var m=0;m<g[j].length;m++)g[j][m]=255&a.buffer[m+c];c+=k;var n=f.getErrorCorrectPolynomial(l),o=new i(g[j],n.getLength()-1),p=o.mod(n);h[j]=new Array(n.getLength()-1);for(var m=0;m<h[j].length;m++){var q=m+p.getLength()-h[j].length;h[j][m]=q>=0?p.get(q):0}}for(var r=0,m=0;m<b.length;m++)r+=b[m].totalCount;for(var s=new Array(r),t=0,m=0;d>m;m++)for(var j=0;j<b.length;j++)m<g[j].length&&(s[t++]=g[j][m]);for(var m=0;e>m;m++)for(var j=0;j<b.length;j++)m<h[j].length&&(s[t++]=h[j][m]);return s};for(var c={MODE_NUMBER:1,MODE_ALPHA_NUM:2,MODE_8BIT_BYTE:4,MODE_KANJI:8},d={L:1,M:0,Q:3,H:2},e={PATTERN000:0,PATTERN001:1,PATTERN010:2,PATTERN011:3,PATTERN100:4,PATTERN101:5,PATTERN110:6,PATTERN111:7},f={PATTERN_POSITION_TABLE:[[],[6,18],[6,22],[6,26],[6,30],[6,34],[6,22,38],[6,24,42],[6,26,46],[6,28,50],[6,30,54],[6,32,58],[6,34,62],[6,26,46,66],[6,26,48,70],[6,26,50,74],[6,30,54,78],[6,30,56,82],[6,30,58,86],[6,34,62,90],[6,28,50,72,94],[6,26,50,74,98],[6,30,54,78,102],[6,28,54,80,106],[6,32,58,84,110],[6,30,58,86,114],[6,34,62,90,118],[6,26,50,74,98,122],[6,30,54,78,102,126],[6,26,52,78,104,130],[6,30,56,82,108,134],[6,34,60,86,112,138],[6,30,58,86,114,142],[6,34,62,90,118,146],[6,30,54,78,102,126,150],[6,24,50,76,102,128,154],[6,28,54,80,106,132,158],[6,32,58,84,110,136,162],[6,26,54,82,110,138,166],[6,30,58,86,114,142,170]],G15:1335,G18:7973,G15_MASK:21522,getBCHTypeInfo:function(a){for(var b=a<<10;f.getBCHDigit(b)-f.getBCHDigit(f.G15)>=0;)b^=f.G15<<f.getBCHDigit(b)-f.getBCHDigit(f.G15);return(a<<10|b)^f.G15_MASK},getBCHTypeNumber:function(a){for(var b=a<<12;f.getBCHDigit(b)-f.getBCHDigit(f.G18)>=0;)b^=f.G18<<f.getBCHDigit(b)-f.getBCHDigit(f.G18);return a<<12|b},getBCHDigit:function(a){for(var b=0;0!=a;)b++,a>>>=1;return b},getPatternPosition:function(a){return f.PATTERN_POSITION_TABLE[a-1]},getMask:function(a,b,c){switch(a){case e.PATTERN000:return 0==(b+c)%2;case e.PATTERN001:return 0==b%2;case e.PATTERN010:return 0==c%3;case e.PATTERN011:return 0==(b+c)%3;case e.PATTERN100:return 0==(Math.floor(b/2)+Math.floor(c/3))%2;case e.PATTERN101:return 0==b*c%2+b*c%3;case e.PATTERN110:return 0==(b*c%2+b*c%3)%2;case e.PATTERN111:return 0==(b*c%3+(b+c)%2)%2;default:throw new Error("bad maskPattern:"+a)}},getErrorCorrectPolynomial:function(a){for(var b=new i([1],0),c=0;a>c;c++)b=b.multiply(new i([1,g.gexp(c)],0));return b},getLengthInBits:function(a,b){if(b>=1&&10>b)switch(a){case c.MODE_NUMBER:return 10;case c.MODE_ALPHA_NUM:return 9;case c.MODE_8BIT_BYTE:return 8;case c.MODE_KANJI:return 8;default:throw new Error("mode:"+a)}else if(27>b)switch(a){case c.MODE_NUMBER:return 12;case c.MODE_ALPHA_NUM:return 11;case c.MODE_8BIT_BYTE:return 16;case c.MODE_KANJI:return 10;default:throw new Error("mode:"+a)}else{if(!(41>b))throw new Error("type:"+b);switch(a){case c.MODE_NUMBER:return 14;case c.MODE_ALPHA_NUM:return 13;case c.MODE_8BIT_BYTE:return 16;case c.MODE_KANJI:return 12;default:throw new Error("mode:"+a)}}},getLostPoint:function(a){for(var b=a.getModuleCount(),c=0,d=0;b>d;d++)for(var e=0;b>e;e++){for(var f=0,g=a.isDark(d,e),h=-1;1>=h;h++)if(!(0>d+h||d+h>=b))for(var i=-1;1>=i;i++)0>e+i||e+i>=b||(0!=h||0!=i)&&g==a.isDark(d+h,e+i)&&f++;f>5&&(c+=3+f-5)}for(var d=0;b-1>d;d++)for(var e=0;b-1>e;e++){var j=0;a.isDark(d,e)&&j++,a.isDark(d+1,e)&&j++,a.isDark(d,e+1)&&j++,a.isDark(d+1,e+1)&&j++,(0==j||4==j)&&(c+=3)}for(var d=0;b>d;d++)for(var e=0;b-6>e;e++)a.isDark(d,e)&&!a.isDark(d,e+1)&&a.isDark(d,e+2)&&a.isDark(d,e+3)&&a.isDark(d,e+4)&&!a.isDark(d,e+5)&&a.isDark(d,e+6)&&(c+=40);for(var e=0;b>e;e++)for(var d=0;b-6>d;d++)a.isDark(d,e)&&!a.isDark(d+1,e)&&a.isDark(d+2,e)&&a.isDark(d+3,e)&&a.isDark(d+4,e)&&!a.isDark(d+5,e)&&a.isDark(d+6,e)&&(c+=40);for(var k=0,e=0;b>e;e++)for(var d=0;b>d;d++)a.isDark(d,e)&&k++;var l=Math.abs(100*k/b/b-50)/5;return c+=10*l}},g={glog:function(a){if(1>a)throw new Error("glog("+a+")");return g.LOG_TABLE[a]},gexp:function(a){for(;0>a;)a+=255;for(;a>=256;)a-=255;return g.EXP_TABLE[a]},EXP_TABLE:new Array(256),LOG_TABLE:new Array(256)},h=0;8>h;h++)g.EXP_TABLE[h]=1<<h;for(var h=8;256>h;h++)g.EXP_TABLE[h]=g.EXP_TABLE[h-4]^g.EXP_TABLE[h-5]^g.EXP_TABLE[h-6]^g.EXP_TABLE[h-8];for(var h=0;255>h;h++)g.LOG_TABLE[g.EXP_TABLE[h]]=h;i.prototype={get:function(a){return this.num[a]},getLength:function(){return this.num.length},multiply:function(a){for(var b=new Array(this.getLength()+a.getLength()-1),c=0;c<this.getLength();c++)for(var d=0;d<a.getLength();d++)b[c+d]^=g.gexp(g.glog(this.get(c))+g.glog(a.get(d)));return new i(b,0)},mod:function(a){if(this.getLength()-a.getLength()<0)return this;for(var b=g.glog(this.get(0))-g.glog(a.get(0)),c=new Array(this.getLength()),d=0;d<this.getLength();d++)c[d]=this.get(d);for(var d=0;d<a.getLength();d++)c[d]^=g.gexp(g.glog(a.get(d))+b);return new i(c,0).mod(a)}},j.RS_BLOCK_TABLE=[[1,26,19],[1,26,16],[1,26,13],[1,26,9],[1,44,34],[1,44,28],[1,44,22],[1,44,16],[1,70,55],[1,70,44],[2,35,17],[2,35,13],[1,100,80],[2,50,32],[2,50,24],[4,25,9],[1,134,108],[2,67,43],[2,33,15,2,34,16],[2,33,11,2,34,12],[2,86,68],[4,43,27],[4,43,19],[4,43,15],[2,98,78],[4,49,31],[2,32,14,4,33,15],[4,39,13,1,40,14],[2,121,97],[2,60,38,2,61,39],[4,40,18,2,41,19],[4,40,14,2,41,15],[2,146,116],[3,58,36,2,59,37],[4,36,16,4,37,17],[4,36,12,4,37,13],[2,86,68,2,87,69],[4,69,43,1,70,44],[6,43,19,2,44,20],[6,43,15,2,44,16],[4,101,81],[1,80,50,4,81,51],[4,50,22,4,51,23],[3,36,12,8,37,13],[2,116,92,2,117,93],[6,58,36,2,59,37],[4,46,20,6,47,21],[7,42,14,4,43,15],[4,133,107],[8,59,37,1,60,38],[8,44,20,4,45,21],[12,33,11,4,34,12],[3,145,115,1,146,116],[4,64,40,5,65,41],[11,36,16,5,37,17],[11,36,12,5,37,13],[5,109,87,1,110,88],[5,65,41,5,66,42],[5,54,24,7,55,25],[11,36,12],[5,122,98,1,123,99],[7,73,45,3,74,46],[15,43,19,2,44,20],[3,45,15,13,46,16],[1,135,107,5,136,108],[10,74,46,1,75,47],[1,50,22,15,51,23],[2,42,14,17,43,15],[5,150,120,1,151,121],[9,69,43,4,70,44],[17,50,22,1,51,23],[2,42,14,19,43,15],[3,141,113,4,142,114],[3,70,44,11,71,45],[17,47,21,4,48,22],[9,39,13,16,40,14],[3,135,107,5,136,108],[3,67,41,13,68,42],[15,54,24,5,55,25],[15,43,15,10,44,16],[4,144,116,4,145,117],[17,68,42],[17,50,22,6,51,23],[19,46,16,6,47,17],[2,139,111,7,140,112],[17,74,46],[7,54,24,16,55,25],[34,37,13],[4,151,121,5,152,122],[4,75,47,14,76,48],[11,54,24,14,55,25],[16,45,15,14,46,16],[6,147,117,4,148,118],[6,73,45,14,74,46],[11,54,24,16,55,25],[30,46,16,2,47,17],[8,132,106,4,133,107],[8,75,47,13,76,48],[7,54,24,22,55,25],[22,45,15,13,46,16],[10,142,114,2,143,115],[19,74,46,4,75,47],[28,50,22,6,51,23],[33,46,16,4,47,17],[8,152,122,4,153,123],[22,73,45,3,74,46],[8,53,23,26,54,24],[12,45,15,28,46,16],[3,147,117,10,148,118],[3,73,45,23,74,46],[4,54,24,31,55,25],[11,45,15,31,46,16],[7,146,116,7,147,117],[21,73,45,7,74,46],[1,53,23,37,54,24],[19,45,15,26,46,16],[5,145,115,10,146,116],[19,75,47,10,76,48],[15,54,24,25,55,25],[23,45,15,25,46,16],[13,145,115,3,146,116],[2,74,46,29,75,47],[42,54,24,1,55,25],[23,45,15,28,46,16],[17,145,115],[10,74,46,23,75,47],[10,54,24,35,55,25],[19,45,15,35,46,16],[17,145,115,1,146,116],[14,74,46,21,75,47],[29,54,24,19,55,25],[11,45,15,46,46,16],[13,145,115,6,146,116],[14,74,46,23,75,47],[44,54,24,7,55,25],[59,46,16,1,47,17],[12,151,121,7,152,122],[12,75,47,26,76,48],[39,54,24,14,55,25],[22,45,15,41,46,16],[6,151,121,14,152,122],[6,75,47,34,76,48],[46,54,24,10,55,25],[2,45,15,64,46,16],[17,152,122,4,153,123],[29,74,46,14,75,47],[49,54,24,10,55,25],[24,45,15,46,46,16],[4,152,122,18,153,123],[13,74,46,32,75,47],[48,54,24,14,55,25],[42,45,15,32,46,16],[20,147,117,4,148,118],[40,75,47,7,76,48],[43,54,24,22,55,25],[10,45,15,67,46,16],[19,148,118,6,149,119],[18,75,47,31,76,48],[34,54,24,34,55,25],[20,45,15,61,46,16]],j.getRSBlocks=function(a,b){var c=j.getRsBlockTable(a,b);if(void 0==c)throw new Error("bad rs block @ typeNumber:"+a+"/errorCorrectLevel:"+b);for(var d=c.length/3,e=[],f=0;d>f;f++)for(var g=c[3*f+0],h=c[3*f+1],i=c[3*f+2],k=0;g>k;k++)e.push(new j(h,i));return e},j.getRsBlockTable=function(a,b){switch(b){case d.L:return j.RS_BLOCK_TABLE[4*(a-1)+0];case d.M:return j.RS_BLOCK_TABLE[4*(a-1)+1];case d.Q:return j.RS_BLOCK_TABLE[4*(a-1)+2];case d.H:return j.RS_BLOCK_TABLE[4*(a-1)+3];default:return void 0}},k.prototype={get:function(a){var b=Math.floor(a/8);return 1==(1&this.buffer[b]>>>7-a%8)},put:function(a,b){for(var c=0;b>c;c++)this.putBit(1==(1&a>>>b-c-1))},getLengthInBits:function(){return this.length},putBit:function(a){var b=Math.floor(this.length/8);this.buffer.length<=b&&this.buffer.push(0),a&&(this.buffer[b]|=128>>>this.length%8),this.length++}};var l=[[17,14,11,7],[32,26,20,14],[53,42,32,24],[78,62,46,34],[106,84,60,44],[134,106,74,58],[154,122,86,64],[192,152,108,84],[230,180,130,98],[271,213,151,119],[321,251,177,137],[367,287,203,155],[425,331,241,177],[458,362,258,194],[520,412,292,220],[586,450,322,250],[644,504,364,280],[718,560,394,310],[792,624,442,338],[858,666,482,382],[929,711,509,403],[1003,779,565,439],[1091,857,611,461],[1171,911,661,511],[1273,997,715,535],[1367,1059,751,593],[1465,1125,805,625],[1528,1190,868,658],[1628,1264,908,698],[1732,1370,982,742],[1840,1452,1030,790],[1952,1538,1112,842],[2068,1628,1168,898],[2188,1722,1228,958],[2303,1809,1283,983],[2431,1911,1351,1051],[2563,1989,1423,1093],[2699,2099,1499,1139],[2809,2213,1579,1219],[2953,2331,1663,1273]],o=function(){var a=function(a,b){this._el=a,this._htOption=b};return a.prototype.draw=function(a){function g(a,b){var c=document.createElementNS("http://www.w3.org/2000/svg",a);for(var d in b)b.hasOwnProperty(d)&&c.setAttribute(d,b[d]);return c}var b=this._htOption,c=this._el,d=a.getModuleCount();Math.floor(b.width/d),Math.floor(b.height/d),this.clear();var h=g("svg",{viewBox:"0 0 "+String(d)+" "+String(d),width:"100%",height:"100%",fill:b.colorLight});h.setAttributeNS("http://www.w3.org/2000/xmlns/","xmlns:xlink","http://www.w3.org/1999/xlink"),c.appendChild(h),h.appendChild(g("rect",{fill:b.colorDark,width:"1",height:"1",id:"template"}));for(var i=0;d>i;i++)for(var j=0;d>j;j++)if(a.isDark(i,j)){var k=g("use",{x:String(i),y:String(j)});k.setAttributeNS("http://www.w3.org/1999/xlink","href","#template"),h.appendChild(k)}},a.prototype.clear=function(){for(;this._el.hasChildNodes();)this._el.removeChild(this._el.lastChild)},a}(),p="svg"===document.documentElement.tagName.toLowerCase(),q=p?o:m()?function(){function a(){this._elImage.src=this._elCanvas.toDataURL("image/png"),this._elImage.style.display="block",this._elCanvas.style.display="none"}function d(a,b){var c=this;if(c._fFail=b,c._fSuccess=a,null===c._bSupportDataURI){var d=document.createElement("img"),e=function(){c._bSupportDataURI=!1,c._fFail&&_fFail.call(c)},f=function(){c._bSupportDataURI=!0,c._fSuccess&&c._fSuccess.call(c)};return d.onabort=e,d.onerror=e,d.onload=f,d.src="data:image/gif;base64,iVBORw0KGgoAAAANSUhEUgAAAAUAAAAFCAYAAACNbyblAAAAHElEQVQI12P4//8/w38GIAXDIBKE0DHxgljNBAAO9TXL0Y4OHwAAAABJRU5ErkJggg==",void 0}c._bSupportDataURI===!0&&c._fSuccess?c._fSuccess.call(c):c._bSupportDataURI===!1&&c._fFail&&c._fFail.call(c)}if(this._android&&this._android<=2.1){var b=1/window.devicePixelRatio,c=CanvasRenderingContext2D.prototype.drawImage;CanvasRenderingContext2D.prototype.drawImage=function(a,d,e,f,g,h,i,j){if("nodeName"in a&&/img/i.test(a.nodeName))for(var l=arguments.length-1;l>=1;l--)arguments[l]=arguments[l]*b;else"undefined"==typeof j&&(arguments[1]*=b,arguments[2]*=b,arguments[3]*=b,arguments[4]*=b);c.apply(this,arguments)}}var e=function(a,b){this._bIsPainted=!1,this._android=n(),this._htOption=b,this._elCanvas=document.createElement("canvas"),this._elCanvas.width=b.width,this._elCanvas.height=b.height,a.appendChild(this._elCanvas),this._el=a,this._oContext=this._elCanvas.getContext("2d"),this._bIsPainted=!1,this._elImage=document.createElement("img"),this._elImage.style.display="none",this._el.appendChild(this._elImage),this._bSupportDataURI=null};return e.prototype.draw=function(a){var b=this._elImage,c=this._oContext,d=this._htOption,e=a.getModuleCount(),f=d.width/e,g=d.height/e,h=Math.round(f),i=Math.round(g);b.style.display="none",this.clear();for(var j=0;e>j;j++)for(var k=0;e>k;k++){var l=a.isDark(j,k),m=k*f,n=j*g;c.strokeStyle=l?d.colorDark:d.colorLight,c.lineWidth=1,c.fillStyle=l?d.colorDark:d.colorLight,c.fillRect(m,n,f,g),c.strokeRect(Math.floor(m)+.5,Math.floor(n)+.5,h,i),c.strokeRect(Math.ceil(m)-.5,Math.ceil(n)-.5,h,i)}this._bIsPainted=!0},e.prototype.makeImage=function(){this._bIsPainted&&d.call(this,a)},e.prototype.isPainted=function(){return this._bIsPainted},e.prototype.clear=function(){this._oContext.clearRect(0,0,this._elCanvas.width,this._elCanvas.height),this._bIsPainted=!1},e.prototype.round=function(a){return a?Math.floor(1e3*a)/1e3:a},e}():function(){var a=function(a,b){this._el=a,this._htOption=b};return a.prototype.draw=function(a){for(var b=this._htOption,c=this._el,d=a.getModuleCount(),e=Math.floor(b.width/d),f=Math.floor(b.height/d),g=['<table style="border:0;border-collapse:collapse;">'],h=0;d>h;h++){g.push("<tr>");for(var i=0;d>i;i++)g.push('<td style="border:0;border-collapse:collapse;padding:0;margin:0;width:'+e+"px;height:"+f+"px;background-color:"+(a.isDark(h,i)?b.colorDark:b.colorLight)+';"></td>');g.push("</tr>")}g.push("</table>"),c.innerHTML=g.join("");var j=c.childNodes[0],k=(b.width-j.offsetWidth)/2,l=(b.height-j.offsetHeight)/2;k>0&&l>0&&(j.style.margin=l+"px "+k+"px")},a.prototype.clear=function(){this._el.innerHTML=""},a}();QRCode=function(a,b){if(this._htOption={width:256,height:256,typeNumber:4,colorDark:"#000000",colorLight:"#ffffff",correctLevel:d.H},"string"==typeof b&&(b={text:b}),b)for(var c in b)this._htOption[c]=b[c];"string"==typeof a&&(a=document.getElementById(a)),this._android=n(),this._el=a,this._oQRCode=null,this._oDrawing=new q(this._el,this._htOption),this._htOption.text&&this.makeCode(this._htOption.text)},QRCode.prototype.makeCode=function(a){this._oQRCode=new b(r(a,this._htOption.correctLevel),this._htOption.correctLevel),this._oQRCode.addData(a),this._oQRCode.make(),this._el.title=a,this._oDrawing.draw(this._oQRCode),this.makeImage()},QRCode.prototype.makeImage=function(){"function"==typeof this._oDrawing.makeImage&&(!this._android||this._android>=3)&&this._oDrawing.makeImage()},QRCode.prototype.clear=function(){this._oDrawing.clear()},QRCode.CorrectLevel=d}();
+</script>
+<script>
+// ── Compressed Cookie Storage ───────────────────────────────────────────────
+const COOKIE_NAME = 'qr_gen_prefs';
+const COOKIE_MAX_AGE = 60 * 60 * 24 * 365 * 3; // 3 years
+const COOKIE_MAX_PAYLOAD_LEN = 3900; // safe payload ceiling within browser 4096 cookie limit
+
+// In-memory table state: entries sorted chronologically (index 0 = most recent)
+let store = {
+  remember: false,
+  entries: [] // Array of { title, location, description, url, organizer, allDay, ts }
+};
+
+function uint8ToBase64Url(bytes) {
+  let bin = '';
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function base64UrlToUint8(str) {
+  let b64 = str.replace(/-/g, '+').replace(/_/g, '/');
+  while (b64.length % 4) b64 += '=';
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
+async function compressString(str) {
+  const bytes = new TextEncoder().encode(str);
+  if (typeof CompressionStream !== 'undefined') {
+    const cs = new CompressionStream('deflate-raw');
+    const writer = cs.writable.getWriter();
+    writer.write(bytes);
+    writer.close();
+    const chunks = [];
+    const reader = cs.readable.getReader();
+    while (true) {
+      const {done, value} = await reader.read();
+      if (done) break;
+      chunks.push(value);
+    }
+    const total = chunks.reduce((s, c) => s + c.length, 0);
+    const deflated = new Uint8Array(total);
+    let off = 0;
+    for (const c of chunks) { deflated.set(c, off); off += c.length; }
+    return uint8ToBase64Url(deflated);
+  }
+  // Fallback: uncompressed base64url if CompressionStream is absent
+  return uint8ToBase64Url(bytes);
+}
+
+async function decompressString(b64url) {
+  if (!b64url) return null;
+  try {
+    const bytes = base64UrlToUint8(b64url);
+    if (typeof DecompressionStream !== 'undefined') {
+      const ds = new DecompressionStream('deflate-raw');
+      const writer = ds.writable.getWriter();
+      writer.write(bytes);
+      writer.close();
+      const chunks = [];
+      const reader = ds.readable.getReader();
+      while (true) {
+        const {done, value} = await reader.read();
+        if (done) break;
+        chunks.push(value);
+      }
+      const total = chunks.reduce((s, c) => s + c.length, 0);
+      const inflated = new Uint8Array(total);
+      let off = 0;
+      for (const c of chunks) { inflated.set(c, off); off += c.length; }
+      return new TextDecoder().decode(inflated);
+    }
+    return new TextDecoder().decode(bytes);
+  } catch(e) {
+    return null;
+  }
+}
+
+async function loadStore() {
+  const m = document.cookie.match(new RegExp('(?:^|; )' + COOKIE_NAME + '=([^;]*)'));
+  if (!m || !m[1]) {
+    store = { remember: false, entries: [] };
+    return store;
+  }
+  const json = await decompressString(m[1]);
+  if (!json) {
+    store = { remember: false, entries: [] };
+    return store;
+  }
+  try {
+    const data = JSON.parse(json);
+    store = {
+      remember: !!data.remember,
+      entries: Array.isArray(data.entries) ? data.entries : []
+    };
+    // Ensure chronological ordering: newest timestamp first
+    store.entries.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+  } catch(e) {
+    store = { remember: false, entries: [] };
+  }
+  return store;
+}
+
+async function persistStore() {
+  // Sort chronologically (newest / most recently modified first)
+  store.entries.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+
+  let payload = '';
+  while (true) {
+    const json = JSON.stringify(store);
+    payload = await compressString(json);
+    if (payload.length <= COOKIE_MAX_PAYLOAD_LEN || store.entries.length <= 1) {
+      break;
+    }
+    // Exceeded 4K limit: drop the chronologically last (oldest) entry and re-compress
+    store.entries.pop();
+  }
+
+  if (payload.length > COOKIE_MAX_PAYLOAD_LEN && store.entries.length > 0) {
+    store.entries = [];
+    payload = await compressString(JSON.stringify(store));
+  }
+
+  document.cookie = COOKIE_NAME + '=' + payload + '; max-age=' + COOKIE_MAX_AGE + '; path=/; SameSite=Strict';
+}
+
+// ── Field IDs ───────────────────────────────────────────────────────────────
+const FIELD_IDS = ['title','startDate','startTime','endDate','endTime','location','description','url','organizer'];
+// Fields persisted per entry in cookie — dates/times excluded (they change every event)
+const SAVED_FIELDS = ['title','location','description','url','organizer'];
+function getFieldValues() {
+  const obj = {};
+  FIELD_IDS.forEach(id => { obj[id] = document.getElementById(id).value.trim(); });
+  return obj;
+}
+
+// ── In-memory state for Forget ──────────────────────────────────────────────
+let loadedHistoryTitle = '';
+
+function hideForgetBtn() {
+  loadedHistoryTitle = '';
+  document.getElementById('forget-btn').style.display = 'none';
+}
+
+// Restore a saved cookie entry into the form. `skip(id)` may veto individual fields.
+function applyEntry(entry, skip) {
+  SAVED_FIELDS.forEach(id => {
+    if (entry[id] !== undefined && !(skip && skip(id))) {
+      document.getElementById(id).value = entry[id];
+    }
+  });
+  const restoredAllDay = !!entry.allDay;
+  document.getElementById('allDay').checked = restoredAllDay;
+  applyAllDay(restoredAllDay);
+}
+
+// ── iCal builder ────────────────────────────────────────────────────────────
+function escIcal(s) {
+  return s.replace(/\\/g,'\\\\').replace(/,/g,'\\,').replace(/;/g,'\\;').replace(/\n/g,'\\n');
+}
+
+// No line folding for QR payloads — folding is for .ics file interchange only.
+// QR decoders pass the raw string to the calendar app; fold-continuation spaces
+// corrupt words and the leading-space strip is not universally implemented.
+
+function fmtLocal(dateStr, timeStr) {
+  // dateStr: YYYY-MM-DD, timeStr: HH:MM
+  return dateStr.replace(/-/g,'') + 'T' + timeStr.replace(/:/g,'') + '00';
+}
+
+// YYYY-MM-DD → YYYY-MM-DD of the following day
+function nextDay(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + 1);
+  const pad = n => String(n).padStart(2,'0');
+  return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate());
+}
+
+// FNV-1a-32 hash of a string → 6 hex chars (deterministic: same title → same UID)
+function titleHex(str) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = (Math.imul(h, 0x01000193) >>> 0);
+  }
+  return h.toString(16).padStart(8, '0').slice(0, 6);
+}
+
+function buildIcal(f, allDay) {
+  const lines = [];
+  // Minimal header — PRODID and DTSTAMP are optional for QR payloads and cost bytes
+  lines.push('BEGIN:VCALENDAR');
+  lines.push('VERSION:2.0');
+  lines.push('BEGIN:VEVENT');
+  lines.push('UID:' + titleHex(f.title));      // deterministic: same title → same UID
+  if (allDay) {
+    lines.push('DTSTART;VALUE=DATE:' + f.startDate.replace(/-/g,''));
+    lines.push('DTEND;VALUE=DATE:'   + nextDay(f.endDate).replace(/-/g,''));
+  } else {
+    lines.push('DTSTART:' + fmtLocal(f.startDate, f.startTime));
+    lines.push('DTEND:'   + fmtLocal(f.endDate,   f.endTime));
+  }
+  lines.push('SUMMARY:' + escIcal(f.title));
+  if (f.location)    lines.push('LOCATION:'    + escIcal(f.location));
+  if (f.description) lines.push('DESCRIPTION:' + escIcal(f.description));
+  if (f.url)         lines.push('URL:'         + f.url);
+  if (f.organizer) {
+    const org = f.organizer.trim();
+    // If it looks like an email use it as mailto:, otherwise a placeholder
+    lines.push('ORGANIZER;CN="' + escIcal(org) + '":mailto:' + (org.includes('@') ? org : 'unknown'));
+  }
+  lines.push('END:VEVENT');
+  lines.push('END:VCALENDAR');
+  return lines.join('\n');
+}
+
+// ── QR version-drop hint ──────────────────────────────────────────────────────
+// Library: d={L:1,M:0}. switch(b){ case 1(L): h=l[f][0]; case 0(M): h=l[f][1] }
+// So L(=1)→col0, M(=0)→col1.
+// Library's s() (patched) returns the exact UTF-8 byte length of the payload.
+// Capacity table [col0=L-cap, col1=M-cap] per version, index=version-1.
+const QR_CAP = [
+  [17,14],[32,26],[53,42],[78,62],[106,84],[134,106],[154,122],[192,152],
+  [230,180],[271,213],[321,251],[367,287],[425,331],[458,362],[520,412],
+  [586,450],[644,504],[718,560],[792,624],[858,666],[929,711],[1003,779],
+  [1091,857],[1171,911],[1273,997],[1367,1059],[1465,1125],[1528,1190],
+  [1628,1264],[1732,1370],[1840,1452],[1952,1538],[2068,1628],[2188,1722],
+  [2303,1809],[2431,1911],[2563,1989],[2699,2099],[2809,2213],[2953,2331]
+];
+
+function qrSavingsHint(icalText, moduleCount, usedLevel) {
+  const version  = (moduleCount - 17) / 4;   // 1-based integer
+  if (version <= 1) return null;
+  // L(=1)→col0, M(=0)→col1
+  const col      = (usedLevel === QRCode.CorrectLevel.L) ? 0 : 1;
+  const prevCap  = QR_CAP[version - 2][col];  // capacity of version-1
+  // Mirror library's patched s(): exact UTF-8 byte length
+  const measured = new TextEncoder().encode(icalText).length;
+  const save     = measured - prevCap;
+  // Show only when: save > 0, AND save ≤ 20, AND save < 1/3 of current payload length
+  if (save > 0 && save <= 20 && save < measured / 3) return {save, version, prevVersion: version - 1};
+  return null;
+}
+
+// ── QR generation ────────────────────────────────────────────────────────────
+// Cached object URL for the pre-encoded 1-bit PNG (ready before user clicks Download)
+let _pngObjectUrl  = null;
+let _lastIcalText  = '';
+
+// ── Shared QR probe — returns {oQR, level} or null if text is too large ──────
+function probeQR(icalText) {
+  let oQR = null, level = QRCode.CorrectLevel.M;
+  for (const useDom of [false, true]) {
+    if (oQR) break;
+    for (const lvl of [QRCode.CorrectLevel.M, QRCode.CorrectLevel.L]) {
+      const tmp = document.createElement('div');
+      if (useDom) {
+        tmp.style.cssText = 'position:absolute;left:-9999px;top:0;visibility:hidden';
+        document.body.appendChild(tmp);
+      }
+      try {
+        const q = new QRCode(tmp, {
+          text: icalText, width: 64, height: 64,
+          correctLevel: lvl, typeNumber: 0
+        });
+        if (q._oQRCode && q._oQRCode.moduleCount >= 21) {
+          oQR = q._oQRCode; level = lvl;
+        }
+      } catch(e) {}
+      if (useDom) document.body.removeChild(tmp);
+      if (oQR) break;
+    }
+  }
+  return oQR ? {oQR, level} : null;
+}
+
+// Show the size-reduction hint for result `h` of qrSavingsHint(), or hide it if null.
+function showHint(h) {
+  const hint = document.getElementById('qr-hint');
+  if (h) {
+    hint.textContent = `💡 Removing ${h.save} character${h.save===1?'':'s'} would reduce the QR size (version ${h.version} → ${h.prevVersion}).`;
+    hint.style.display = 'block';
+  } else {
+    hint.style.display = 'none';
+  }
+}
+
+// ── Live hint — recalculates without rendering a QR ──────────────────────────
+function updateLiveHint() {
+  const allDay = document.getElementById('allDay').checked;
+  const f = getFieldValues();
+  // Need at minimum title + dates to build iCal
+  if (!f.title || !f.startDate || !f.endDate) return showHint(null);
+  if (!allDay && (!f.startTime || !f.endTime)) return showHint(null);
+  const ical  = buildIcal(f, allDay);
+  const probe = probeQR(ical);
+  showHint(probe && qrSavingsHint(ical, probe.oQR.moduleCount, probe.level));
+}
+
+function generateQR(icalText, f, targetSize) {
+  const out = document.getElementById('qr-output');
+  out.innerHTML = '';
+
+  if (_pngObjectUrl) { URL.revokeObjectURL(_pngObjectUrl); _pngObjectUrl = null; }
+
+  const inverted   = document.getElementById('invert').checked;
+  const colorDark  = inverted ? '#ffffff' : '#000000';
+  const colorLight = inverted ? '#1a1a2e' : '#ffffff';
+  out.style.background = colorLight;
+
+  // ── Step 1: build QR data model via the library ──────────────────────────
+  const TARGET = targetSize || 512;
+  const probed = probeQR(icalText);
+  const oQR    = probed && probed.oQR;
+  const level  = probed ? probed.level : QRCode.CorrectLevel.M;
+  if (!oQR) {
+    // Show payload size and hint about which field to shorten
+    const bytes = icalText.length;
+    const fieldLengths = [
+      f.description ? `Description: ${f.description.length} chars` : null,
+      f.url         ? `URL: ${f.url.length} chars` : null,
+      f.location    ? `Location: ${f.location.length} chars` : null,
+    ].filter(Boolean).join(', ');
+    out.innerHTML = `<p style="color:#f87171;padding:12px;font-size:.85rem">
+      Payload too large for QR (${bytes} chars, max ~2953 at Level L).<br>
+      ${fieldLengths ? 'Try shortening: ' + fieldLengths : 'Shorten the description or other long fields.'}
+    </p>`;
+    return;
+  }
+
+  const M    = oQR.moduleCount;                        // number of modules
+  const N    = Math.max(2, Math.floor(TARGET / M));    // px per module
+  const size = M * N;                                  // exact canvas size
+
+  // ── Step 2: draw ourselves — integer fillRect, no stroke, no offset ─────
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = colorLight;
+  ctx.fillRect(0, 0, size, size);
+
+  ctx.fillStyle = colorDark;
+  for (let row = 0; row < M; row++) {
+    for (let col = 0; col < M; col++) {
+      if (oQR.isDark(row, col)) {
+        ctx.fillRect(col * N, row * N, N, N);
+      }
+    }
+  }
+
+  // Set title for hover tooltip showing the iCal source
+  out.title = icalText;
+  out.appendChild(canvas);
+
+  // Store ical text for Copy button
+  _lastIcalText = icalText;
+
+  showHint(qrSavingsHint(icalText, M, level));
+
+  // ── Step 3: start background 1-bit PNG encode immediately ───────────────
+  canvasTo1bitPNG(canvas).then(url => { _pngObjectUrl = url; });
+
+  document.getElementById('dl-btn').style.display = 'inline-block';
+  document.getElementById('copy-btn').style.display = 'inline-block';
+}
+
+// ── 1-bit palette PNG encoder (async, real DEFLATE via CompressionStream) ────
+// Canvas API only exports 32-bit RGBA. We build a true 1-bit indexed PNG manually.
+// Uses CompressionStream('deflate-raw') for real compression; falls back to zlib
+// store blocks on older browsers.
+async function canvasTo1bitPNG(canvas) {
+  const w = canvas.width, h = canvas.height;
+  const ctx = canvas.getContext('2d');
+  const rgba = ctx.getImageData(0, 0, w, h).data;
+
+  // ── CRC-32 ──
+  const crcTable = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    crcTable[n] = c;
+  }
+  function crc32(buf) {
+    let c = 0xFFFFFFFF;
+    for (let i = 0; i < buf.length; i++) c = (crcTable[(c ^ buf[i]) & 0xFF] ^ (c >>> 8)) >>> 0;
+    return (c ^ 0xFFFFFFFF) >>> 0;
+  }
+
+  function u32be(v) {
+    const b = new Uint8Array(4);
+    new DataView(b.buffer).setUint32(0, v >>> 0);
+    return b;
+  }
+
+  // ── PNG chunk ──
+  function pngChunk(type, data) {
+    const tb = type.split('').map(c => c.charCodeAt(0));
+    const ci = new Uint8Array(4 + data.length);
+    ci.set(tb); ci.set(data, 4);
+    const cv = crc32(ci);
+    const out = new Uint8Array(4 + 4 + data.length + 4);
+    out.set(u32be(data.length), 0);
+    out.set(tb, 4);
+    out.set(data, 8);
+    out.set(u32be(cv), 8 + data.length);
+    return out;
+  }
+
+  // ── Build 1-bit scanlines with PNG filter byte 0 (None) per row ──
+  const rowBytes = Math.ceil(w / 8);
+  const raw = new Uint8Array(h * (1 + rowBytes));
+  for (let y = 0; y < h; y++) {
+    raw[y * (1 + rowBytes)] = 0; // filter = None
+    for (let x = 0; x < w; x++) {
+      const idx = (y * w + x) * 4;
+      const dark = (rgba[idx] + rgba[idx+1] + rgba[idx+2]) < 384 ? 1 : 0;
+      const bytePos = y * (1 + rowBytes) + 1 + Math.floor(x / 8);
+      raw[bytePos] |= dark << (7 - (x % 8));
+    }
+  }
+
+  // ── Compress raw scanlines ──
+  // Try CompressionStream('deflate-raw') — gives real DEFLATE, then wrap in zlib.
+  // Fall back to uncompressed store blocks if not available.
+  async function compress(data) {
+    if (typeof CompressionStream !== 'undefined') {
+      // deflate-raw produces raw DEFLATE; wrap in zlib envelope manually
+      const cs = new CompressionStream('deflate-raw');
+      const writer = cs.writable.getWriter();
+      writer.write(data);
+      writer.close();
+      const chunks = [];
+      const reader = cs.readable.getReader();
+      while (true) {
+        const {done, value} = await reader.read();
+        if (done) break;
+        chunks.push(value);
+      }
+      const deflated = new Uint8Array(chunks.reduce((s,c) => s + c.length, 0));
+      let off = 0;
+      for (const c of chunks) { deflated.set(c, off); off += c.length; }
+
+      // Adler-32 for zlib trailer
+      let s1 = 1, s2 = 0;
+      for (let i = 0; i < data.length; i++) {
+        s1 = (s1 + data[i]) % 65521;
+        s2 = (s2 + s1)      % 65521;
+      }
+      const adl = (s2 << 16) | s1;
+
+      // zlib = CMF(0x78) + FLG(0x9C = best compression) + deflated + adler32
+      const zlib = new Uint8Array(2 + deflated.length + 4);
+      zlib[0] = 0x78; zlib[1] = 0x9C;
+      zlib.set(deflated, 2);
+      zlib.set(u32be(adl >>> 0), 2 + deflated.length);
+      return zlib;
+    } else {
+      // Fallback: zlib store blocks (no compression)
+      const BSIZE = 65535;
+      const blocks = [];
+      let pos = 0;
+      while (pos < data.length) {
+        const chunk = data.subarray(pos, pos + BSIZE);
+        const last = (pos + BSIZE >= data.length) ? 1 : 0;
+        blocks.push(new Uint8Array([last,
+          chunk.length & 0xFF, chunk.length >> 8,
+          (~chunk.length) & 0xFF, (~chunk.length >> 8) & 0xFF]));
+        blocks.push(chunk);
+        pos += BSIZE;
+      }
+      let s1 = 1, s2 = 0;
+      for (let i = 0; i < data.length; i++) { s1=(s1+data[i])%65521; s2=(s2+s1)%65521; }
+      const adl = (s2 << 16) | s1;
+      const out = new Uint8Array(2 + blocks.reduce((s,b) => s+b.length, 0) + 4);
+      let i = 0;
+      out[i++]=0x78; out[i++]=0x01;
+      for (const b of blocks) { out.set(b,i); i+=b.length; }
+      out.set(u32be(adl>>>0), i);
+      return out;
+    }
+  }
+
+  const idat = await compress(raw);
+
+  // ── PLTE: palette index 0 = light, 1 = dark ──
+  const inverted = document.getElementById('invert').checked;
+  const light = inverted ? [0x1a,0x1a,0x2e] : [0xFF,0xFF,0xFF];
+  const dark  = inverted ? [0xFF,0xFF,0xFF] : [0x00,0x00,0x00];
+
+  // ── IHDR ──
+  const ihdr = new Uint8Array(13);
+  ihdr.set(u32be(w),0); ihdr.set(u32be(h),4);
+  ihdr[8]=1; ihdr[9]=3; // bit depth=1, colour type=indexed
+
+  // ── Assemble PNG ──
+  const sig = new Uint8Array([137,80,78,71,13,10,26,10]);
+  const parts = [
+    sig,
+    pngChunk('IHDR', ihdr),
+    pngChunk('PLTE', new Uint8Array([...light,...dark])),
+    pngChunk('IDAT', idat),
+    pngChunk('IEND', new Uint8Array(0))
+  ];
+  const total = parts.reduce((s,p) => s+p.length, 0);
+  const png = new Uint8Array(total);
+  let off = 0;
+  for (const p of parts) { png.set(p, off); off += p.length; }
+
+  return URL.createObjectURL(new Blob([png], {type:'image/png'}));
+}
+
+// ── Download PNG ─────────────────────────────────────────────────────────────
+document.getElementById('dl-btn').addEventListener('click', async function() {
+  // Use pre-encoded URL if background encode already finished; else encode now
+  let url = _pngObjectUrl;
+  if (!url) {
+    const canvas = document.querySelector('#qr-output canvas');
+    if (!canvas) return;
+    url = await canvasTo1bitPNG(canvas);
+  }
+  const a = document.createElement('a');
+  a.download = 'event-qr.png';
+  a.href = url;
+  a.click();
+  // Don't revoke immediately — let the browser complete the download
+  setTimeout(() => { URL.revokeObjectURL(url); if (url === _pngObjectUrl) _pngObjectUrl = null; }, 30000);
+});
+
+// ── Copy iCal text ────────────────────────────────────────────────────────────
+document.getElementById('copy-btn').addEventListener('click', function() {
+  if (!_lastIcalText) return;
+  const btn = this;
+  const showCopied = () => {
+    btn.textContent = '✓ Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy iCal text'; btn.classList.remove('copied'); }, 2000);
+  };
+  navigator.clipboard.writeText(_lastIcalText).then(showCopied).catch(() => {
+    // Fallback for browsers without clipboard API
+    const ta = document.createElement('textarea');
+    ta.value = _lastIcalText;
+    ta.style.cssText = 'position:absolute;left:-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showCopied();
+  });
+});
+
+// ── All-day toggle ────────────────────────────────────────────────────────────
+function applyAllDay(checked) {
+  const startTime = document.getElementById('startTime');
+  const endTime   = document.getElementById('endTime');
+  const startLbl  = document.getElementById('startTimeLabel');
+  const endLbl    = document.getElementById('endTimeLabel');
+  startTime.disabled = checked;
+  endTime.disabled   = checked;
+  startLbl.classList.toggle('dimmed', checked);
+  endLbl.classList.toggle('dimmed', checked);
+}
+// Prefill end date from start date when end date is empty.
+// All-day: next day. Timed: same day.
+function prefillEndDate() {
+  const startVal = document.getElementById('startDate').value;
+  const endEl    = document.getElementById('endDate');
+  if (!startVal || endEl.value) return;
+  endEl.value = document.getElementById('allDay').checked ? nextDay(startVal) : startVal;
+}
+
+document.getElementById('allDay').addEventListener('change', function() {
+  applyAllDay(this.checked);
+  prefillEndDate();
+  updateLiveHint();
+});
+
+// ── Live hint wiring — update on blur of every text/date/time/url field ───────
+FIELD_IDS.forEach(id => {
+  const el = document.getElementById(id);
+  el.addEventListener('blur',   updateLiveHint);
+  el.addEventListener('change', updateLiveHint);
+});
+
+// Prefill end date when start date is picked
+document.getElementById('startDate').addEventListener('change', prefillEndDate);
+document.getElementById('startDate').addEventListener('blur',   prefillEndDate);
+
+// ── Form submit ───────────────────────────────────────────────────────────────
+document.getElementById('qr-form').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const allDay = document.getElementById('allDay').checked;
+  const f = getFieldValues();
+
+  // URL-only mode: if URL is the only filled field, encode it directly — no iCal.
+  const nonUrlFields = FIELD_IDS.filter(id => id !== 'url');
+  if (f.url && nonUrlFields.every(id => !f[id])) {
+    generateQR(f.url, f, 256);
+    return;
+  }
+
+  if (!f.title || !f.startDate || !f.endDate) {
+    alert('Please fill in the mandatory fields (Title, Start and End date).');
+    return;
+  }
+  if (!allDay && (!f.startTime || !f.endTime)) {
+    alert('Please fill in Start and End time, or check "All day event".');
+    return;
+  }
+  // Validate end is after start
+  if (allDay) {
+    if (f.endDate < f.startDate) {
+      alert('End Date must be on or after Start Date.');
+      return;
+    }
+  } else {
+    const start = f.startDate + 'T' + f.startTime;
+    const end   = f.endDate   + 'T' + f.endTime;
+    if (end <= start) {
+      alert('End Date/Time must be after Start Date/Time.');
+      return;
+    }
+  }
+  const ical = buildIcal(f, allDay);
+  generateQR(ical, f);
+
+  // Save cookie if remember is checked
+  if (document.getElementById('remember').checked) {
+    store.remember = true;
+    const cleanTitle = f.title.trim();
+    // Remove existing entry with same title (case-insensitive) if any
+    store.entries = store.entries.filter(e => e.title.trim().toLowerCase() !== cleanTitle.toLowerCase());
+    // Create new/updated record with current timestamp
+    const newEntry = {
+      title: cleanTitle,
+      location: f.location || '',
+      description: f.description || '',
+      url: f.url || '',
+      organizer: f.organizer || '',
+      allDay: !!allDay,
+      ts: Date.now()
+    };
+    // Insert at front (most recent)
+    store.entries.unshift(newEntry);
+    persistStore();
+  }
+  // After generating, forget button no longer applies
+  hideForgetBtn();
+});
+
+// ── Clear button ──────────────────────────────────────────────────────────────
+document.getElementById('clear-btn').addEventListener('click', function() {
+  document.getElementById('qr-form').reset();
+  applyAllDay(false); // re-enable time fields after reset
+  document.getElementById('qr-output').innerHTML = '';
+  document.getElementById('qr-output').title = '';
+  document.getElementById('qr-hint').style.display = 'none';
+  document.getElementById('dl-btn').style.display = 'none';
+  document.getElementById('copy-btn').style.display = 'none';
+  _lastIcalText = '';
+  hideForgetBtn();
+});
+
+// ── Forget button ─────────────────────────────────────────────────────────────
+document.getElementById('forget-btn').addEventListener('click', function() {
+  if (loadedHistoryTitle) {
+    const t = loadedHistoryTitle.trim().toLowerCase();
+    store.entries = store.entries.filter(e => e.title.trim().toLowerCase() !== t);
+    persistStore();
+  }
+  document.getElementById('clear-btn').click();
+});
+
+// ── Autocomplete ──────────────────────────────────────────────────────────────
+const titleInput = document.getElementById('title');
+const acList = document.getElementById('ac-list');
+let acItems = [];
+let acIndex = -1;
+
+function getHistory() {
+  return store.entries.map(e => e.title);
+}
+
+function renderAc(filter) {
+  const hist = getHistory();
+  const q = filter.toLowerCase();
+  acItems = filter === ''
+    ? hist.slice(0, 10)
+    : hist.filter(h => h.toLowerCase().includes(q)).slice(0, 10);
+  acList.innerHTML = '';
+  acIndex = -1;
+  if (acItems.length === 0) { acList.style.display = 'none'; return; }
+  acItems.forEach((item, i) => {
+    const li = document.createElement('li');
+    li.textContent = item;
+    li.setAttribute('role','option');
+    li.addEventListener('mousedown', function(e) {
+      e.preventDefault(); // prevent blur
+      titleInput.value = item;
+      acList.style.display = 'none';
+      // Restore all fields for this entry from store
+      const entry = store.entries.find(e => e.title === item);
+      if (entry) applyEntry(entry);
+      syncForgetBtn(item);
+    });
+    acList.appendChild(li);
+  });
+  acList.style.display = 'block';
+}
+
+// Show/hide Forget button based on whether the current title exists in the cookie.
+function syncForgetBtn(title) {
+  const t = title.trim().toLowerCase();
+  const found = t && store.entries.some(e => e.title.trim().toLowerCase() === t);
+  const btn = document.getElementById('forget-btn');
+  btn.style.display = found ? 'inline-block' : 'none';
+  if (found) loadedHistoryTitle = title.trim();
+}
+
+titleInput.addEventListener('focus', function() { renderAc(this.value); });
+titleInput.addEventListener('input', function() {
+  renderAc(this.value);
+  syncForgetBtn(this.value);
+});
+titleInput.addEventListener('blur', function() {
+  setTimeout(() => {
+    acList.style.display = 'none';
+    syncForgetBtn(titleInput.value);
+  }, 150);
+});
+titleInput.addEventListener('keydown', function(e) {
+  if (acList.style.display === 'none') return;
+  const items = acList.querySelectorAll('li');
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    acIndex = Math.min(acIndex + 1, items.length - 1);
+    items.forEach((li,i) => li.classList.toggle('active', i === acIndex));
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    acIndex = Math.max(acIndex - 1, -1);
+    items.forEach((li,i) => li.classList.toggle('active', i === acIndex));
+  } else if (e.key === 'Enter' && acIndex >= 0) {
+    e.preventDefault();
+    titleInput.value = acItems[acIndex];
+    acList.style.display = 'none';
+    acIndex = -1;
+    syncForgetBtn(titleInput.value);
+  } else if (e.key === 'Escape') {
+    acList.style.display = 'none';
+    acIndex = -1;
+  }
+});
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.ac-wrap')) acList.style.display = 'none';
+});
+
+// ── URL parameter parsing + auto-trigger ────────────────────────────────────
+// Click the download button once the QR canvas has been rendered.
+function autoDownload() {
+  setTimeout(function() {
+    if (document.querySelector('#qr-output canvas')) document.getElementById('dl-btn').click();
+  }, 400);
+}
+
+function parseUrlParams() {
+  const params = new URLSearchParams(window.location.search);
+  let anyParam = false;
+  FIELD_IDS.forEach(id => {
+    if (params.has(id)) {
+      document.getElementById(id).value = params.get(id);
+      anyParam = true;
+    }
+  });
+  return anyParam;
+}
+
+// ── Page load init ────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async function() {
+  const params = new URLSearchParams(window.location.search);
+
+  // ── URL-only mode: ?url=... with no other iCal params ────────────────────
+  // Bypass the entire iCal form — encode the URL directly as the QR payload.
+  const urlParam = params.get('url');
+  const hasOtherParams = FIELD_IDS.filter(id => id !== 'url' && params.has(id)).length > 0;
+  if (urlParam && !hasOtherParams) {
+    // Clear all fields so the form looks clean, fill only the URL field
+    FIELD_IDS.forEach(id => { document.getElementById(id).value = ''; });
+    document.getElementById('url').value = urlParam;
+    // Generate QR from the raw URL string (no iCal wrapping)
+    setTimeout(function() {
+      generateQR(urlParam, {}, 256);
+      autoDownload();
+    }, 100);
+    return; // skip cookie restore and normal auto-trigger
+  }
+
+  // 1. Apply URL params first (normal iCal mode)
+  const hasUrlParams = parseUrlParams();
+
+  // 2. Load compressed cookie — only fill fields NOT already set by URL params
+  await loadStore();
+  document.getElementById('remember').checked = !!store.remember;
+  // Restore most recent entry (first in history) if remember is on
+  if (store.remember && store.entries.length > 0) {
+    const firstEntry = store.entries[0];
+    applyEntry(firstEntry, id => params.has(id));
+    loadedHistoryTitle = firstEntry.title;
+    document.getElementById('forget-btn').style.display = 'inline-block';
+  }
+
+  // 3. Auto-trigger if URL params present
+  if (hasUrlParams) {
+    const form = document.getElementById('qr-form');
+    setTimeout(function() {
+      form.dispatchEvent(new Event('submit', {bubbles: true, cancelable: true}));
+      autoDownload();
+    }, 100);
+  }
+});
+</script>
+</body>
+</html>
