@@ -1,0 +1,23 @@
+# Default: normalize line endings to LF in the repo, check out as LF on all platforms
+* text=auto
+
+# HTML / JS / CSS — LF in repo, LF on checkout (no CRLF conversion)
+*.html  text eol=lf
+*.js    text eol=lf
+*.css   text eol=lf
+
+# Markdown
+*.md    text eol=lf
+
+# iCal files MUST have CRLF line endings (RFC 5545 §3.1).
+# Mark as binary so Git never touches line endings in either direction.
+*.ics   binary
+*.ical  binary
+
+# Images — always binary
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.svg   binary
