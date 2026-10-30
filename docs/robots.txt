@@ -1,0 +1,3 @@
+User-agent: *
+Disallow: /qr/Weihnachtsvorlesung_2026_import.ics
+Disallow: /qr/Weihnachtsvorlesung_qr.png
