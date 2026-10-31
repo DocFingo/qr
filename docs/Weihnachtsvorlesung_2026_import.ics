@@ -2,11 +2,11 @@ BEGIN:VCALENDAR
 VERSION:2.0
 BEGIN:VEVENT
 UID:07f169
-DTSTAMP:20261030
+DTSTAMP:20261031
 DTSTART:20261215T160000
 DTEND:20261215T180000
 SUMMARY:IBM Weihnachtsvorlesung 2026 - EINMAL IM MILLENIUM
 LOCATION:Einlass 15h30  |  Livestream: http://ibm.biz/Weihnachtsvorlesung_stream
-DESCRIPTION:Tower ONE 37. Etage\, IBM Frankfurt\, Bruesseler Str. 1-3  |  Parkhaus ggu. Bruesseler Str. 4060  |  U4/U5 bis Festhalle  |  An+Abmelden: http://ibm.biz/Weihnachtsvorlesung
+DESCRIPTION:IBM Frankfurt\, Tower ONE 37. Etage\, Bruesseler Str. 1-3  |  Parkhaus ggu. Bruesseler Str. 4060  |  U4/U5 bis Festhalle  |  StrB bis Güterplatz  |  An+Abmelden: http://ibm.biz/Weihnachtsvorlesung
 END:VEVENT
 END:VCALENDAR
