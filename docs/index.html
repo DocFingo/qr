@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -112,15 +112,15 @@ label.time-label.dimmed{color:rgba(255,255,255,.3)}
     </div>
 
     <div class="field">
-      <label class="optional" for="description" title="Miscellaneous event details.&#10;Avoid multi-line as not all clients render them well:&#10;You may see '\n' rather than true line breaks.">Description</label>
-      <textarea id="description" name="description" placeholder="Additional details…" title="Miscellaneous event details.&#10;Avoid multi-line as not all clients render them well:&#10;You may see '\n' rather than true line breaks."></textarea>
+      <label class="optional" for="description" title="Miscellaneous event details.&#10;Avoid multi-line as not all clients render them:&#10;You may see '\n' rather than true line breaks.">Description</label>
+      <textarea id="description" name="description" placeholder="Additional details…" title="Miscellaneous event details.&#10;Avoid multi-line as not all clients render them:&#10;You may see '\n' rather than true line breaks."></textarea>
     </div>
 
     <div id="qr-hint"></div>
 
     <div class="field">
       <label class="optional" for="organizer">Organizer</label>
-      <input type="text" id="organizer" name="organizer" placeholder="Name or email@example.com">
+      <input type="text" id="organizer" name="organizer" placeholder="Name or mailto:user@example.com" title="Has no effect in some calendars, e.g. on Android.&#10;Other calendars only accept mailto: ... organizers.">
     </div>
 
     <div class="checks-line">
